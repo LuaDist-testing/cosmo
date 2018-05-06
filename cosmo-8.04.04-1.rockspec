@@ -2,7 +2,7 @@
 
 package = "cosmo"
 
-version = "8.02.18-1"
+version = "8.04.04-1"
 
 description = {
   summary = "Safe templates for Lua",
@@ -15,16 +15,16 @@ without without the downside of allowing arbitrary code in the templates.
   homepage = "http://cosmo.luaforge.net"
 }
 
-dependencies = { }
+dependencies = { "lpeg >= 0.8.1" }
 
 -- LuaDist source
 source = {
-  tag = "8.02.18-1",
+  tag = "8.04.04-1",
   url = "git://github.com/LuaDist-testing/cosmo.git"
 }
 -- Original source
 -- source = {
---   url = "http://cosmo.luaforge.net/cosmo-8.02.18.tar.gz"
+--   url = "http://cosmo.luaforge.net/cosmo-8.04.04.tar.gz"
 -- }
 
 build = {

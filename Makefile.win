@@ -6,23 +6,13 @@ LUA_LIB= c:\lua5.1\lua5.1.lib
 LUA_DIR= c:\lua5.1\lua
 LUA_LIBDIR= c:\lua5.1
 
-.c.obj:
-	$(CC) /c /MD /Fo$@ $(CFLAGS) /I$(LUA_INCLUDE) $<
-
-all: src\cosmo\lpeg.dll
-
-src\cosmo\lpeg.dll: src\cosmo\lpeg.obj
-	link /dll /out:src\cosmo\lpeg.dll /def:src\cosmo\lpeg.def $(LIB_OPTION) src\cosmo\lpeg.obj
-	IF EXIST src\cosmo\lpeg.dll.manifest mt -manifest src\cosmo\lpeg.dll.manifest -outputresource:src\cosmo\lpeg.dll;2
+all:
 
 install:
 	IF NOT EXIST "$(LUA_DIR)\cosmo" mkdir "$(LUA_DIR)\cosmo"
-	IF NOT EXIST "$(LUA_LIBDIR)\cosmo" mkdir "$(LUA_LIBDIR)\cosmo"
 	copy src\cosmo.lua "$(LUA_DIR)\"
 	copy src\cosmo\grammar.lua "$(LUA_DIR)\cosmo"
 	copy src\cosmo\fill.lua "$(LUA_DIR)\cosmo"
-	copy src\cosmo\re.lua "$(LUA_DIR)\cosmo"
-	copy src\cosmo\lpeg.dll "$(LUA_LIBDIR)\cosmo"
 
 install-rocks: install
 	mkdir "$(PREFIX)\samples"
