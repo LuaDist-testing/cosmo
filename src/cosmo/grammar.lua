@@ -37,6 +37,8 @@ local n = lpeg.R'09'
 
 local alphanum = alpha + n
 
+local name = alpha * (alphanum)^0
+
 local number = (lpeg.P'.' + n)^1 * (lpeg.S'eE' * lpeg.S'+-'^-1)^-1 * (alphanum)^0
 number = #(n + (lpeg.P'.' * n)) * number
 
@@ -47,28 +49,57 @@ local space = (lpeg.S'\n \t\r\f')^0
  
 local syntax = [[
   template <- (%state <item>* -> {} !.) -> compiletemplate
-  item <- <text> / <templateappl>
+  item <- <text> / <templateappl> / (. => error)
   text <- (%state {~ (!<selector> ('$$' -> '$' / .))+ ~}) -> compiletext
   selector <- '$' %alphanum+ ('|' %alphanum+)*
-  templateappl <- (%state {<selector>} {~ <args>? ~} {%longstring?} (%s ',' %s {%longstring})* -> {}) 
-      -> compileapplication
+  templateappl <- (%state {<selector>} {~ <args>? ~} !'{' 
+		   {%longstring?} !%start (%s ',' %s {%longstring})* -> {} !(',' %s %start)) 
+		     -> compileapplication
   args <- '{' %s '}' / '{' %s <arg> %s (',' %s <arg> %s)* ','? %s '}'
-  arg <- <attr> / <literal>
-  attr <- <symbol> %s '=' %s <literal> / '[' %s <literal> %s ']' %s '=' %s <literal>
+  arg <- <attr> / <exp>
+  attr <- <symbol> %s '=' !'=' %s <exp> / '[' !'[' !'=' %s <exp> %s ']' %s '=' %s <exp>
   symbol <- %alpha %alphanum*
-  literal <- <args> / %string / %longstring / %number / 'true' / 'false' / 
-     'nil' / {<selector>} -> parseselector
+  explist <- <exp> (%s ',' %s <exp>)* (%s ',')?
+  exp <- <simpleexp> (%s <binop> %s <simpleexp>)*
+  simpleexp <- <args> / %string / %longstring / %number / 'true' / 'false' / 
+     'nil' / <prefixexp> / <unop> %s <exp> / (. => error)
+  unop <- '-' / 'not' / '#' 
+  binop <- '+' / '-' / '*' / '/' / '^' / '%' / '..' / '<=' / '<' / '>=' / '>' / '==' / '~=' /
+     'and' / 'or'
+  prefixexp <- ( {<selector>} -> parseselector / {%name} -> addenv / '(' %s <exp> %s ')' ) 
+    ( %s <args> / '.' %name / ':' %name %s ('(' %s ')' / '(' %s <explist> %s ')') / 
+    '[' %s <exp> %s ']' / '(' %s ')' / '(' %s <explist> %s ')' / 
+    %string / %longstring %s )*
 ]]
 
+local function pos_to_line(str, pos)
+  local s = str:sub(1, pos)
+  local line, start = 1, 0
+  local newline = string.find(s, "\n")
+  while newline do
+    line = line + 1
+    start = newline
+    newline = string.find(s, "\n", newline + 1)
+  end
+  return line, pos - start
+end
+
 local syntax_defs = {
+  start = start,
   alpha = alpha,
   alphanum = alphanum,
+  name = name,
   number = number,
   string = shortstring,
   longstring = longstring,
   s = space,
   parseselector = parse_selector,
-  state = lpeg.Carg(1)
+  addenv = function (s) return "env['" .. s .. "']" end,
+  state = lpeg.Carg(1),
+  error = function (tmpl, pos)
+    	        local line, pos = pos_to_line(tmpl, pos)
+		error("syntax error in template at line " .. line .. " position " .. pos)
+	      end
 }
 
 function cosmo_compiler(compiler_funcs)

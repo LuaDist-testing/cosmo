@@ -16,7 +16,7 @@ without without the downside of allowing arbitrary code in the templates.
 dependencies = { "lpeg >= 0.8.1" }
 
 source = {
-  url = "http://cosmo.luaforge.net/cosmo-current.tar.gz"
+  url = "git://github.com/mascarenhas/cosmo.git"
 }
 
 build = {
@@ -26,5 +26,5 @@ build = {
      ["cosmo.fill"] = "src/cosmo/fill.lua",
      ["cosmo.grammar"] = "src/cosmo/grammar.lua",
    },
-   copy_directories = { "doc", "samples", "test" }
+   copy_directories = { "doc", "samples", "tests" }
 }

@@ -286,6 +286,12 @@ assert(result == " 12345 ")
 result = cosmo.f(template){ map = cosmo.map }
 assert(result == " 12345 ")
 
+template = " $map{ 1, [[foo]], 3, 4, 5}[[$it]] "
+result = cosmo.fill(template, { map = cosmo.map })
+assert(result == " 1foo345 ")
+result = cosmo.f(template){ map = cosmo.map }
+assert(result == " 1foo345 ")
+
 template = " $map{ 1, 2, 3, 4, 5} "
 result = cosmo.fill(template, { map = cosmo.map })
 assert(result == " 12345 ")
@@ -296,4 +302,64 @@ template = "$inject{ msg = 'Hello', target = 'World' }[[ $msg $target! ]]"
 result = cosmo.fill(template, { inject = cosmo.inject })
 assert(result == " Hello World! ")
 result = cosmo.f(template){ inject = cosmo.inject }
+assert(result == " Hello World! ")
+
+template = "$if{ $x + 3 > 4, target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { x = 0, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ x = 0, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { x = 2, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ x = 2, ["if"] = cosmo.cif }
+assert(result == " Hello World! ")
+
+template = "$if{ x + 3 > 4, target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { x = 0, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ x = 0, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { x = 2, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ x = 2, ["if"] = cosmo.cif }
+assert(result == " Hello World! ")
+
+template = "$if{ $mod($x, 4) == 0, target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { mod = math.fmod, x = 2, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ mod = math.fmod, x = 2, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { mod = math.fmod, x = 4, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ mod = math.fmod, x = 4, ["if"] = cosmo.cif }
+assert(result == " Hello World! ")
+
+template = "$if{ math.fmod(x, 4) == 0, target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { math = math, x = 2, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ math = math, x = 2, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { math = math, x = 4, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ math = math, x = 4, ["if"] = cosmo.cif }
+assert(result == " Hello World! ")
+
+template = "$if{ x == 0, target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { math = math, x = 4, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ math = math, x = 4, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { math = math, x = 0, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ math = math, x = 0, ["if"] = cosmo.cif }
+assert(result == " Hello World! ")
+
+template = "$if{ x(), target = 'World' }[[ Hello $target! ]],[[ Hi $target! ]]"
+result = cosmo.fill(template, { math = math, x = function () return false end, ["if"] = cosmo.cif })
+assert(result == " Hi World! ")
+result = cosmo.f(template){ math = math, x = function () return false end, ["if"] = cosmo.cif }
+assert(result == " Hi World! ")
+result = cosmo.fill(template, { math = math, x = function () return true end, ["if"] = cosmo.cif })
+assert(result == " Hello World! ")
+result = cosmo.f(template){ math = math, x = function () return true end, ["if"] = cosmo.cif }
 assert(result == " Hello World! ")
