@@ -1,8 +1,6 @@
--- This file was automatically generated for the LuaDist project.
+package = "Cosmo"
 
-package = "cosmo"
-
-version = "10.03.31-1"
+version = "10.04.06-1"
 
 description = {
   summary = "Safe templates for Lua",
@@ -17,15 +15,9 @@ without without the downside of allowing arbitrary code in the templates.
 
 dependencies = { "lpeg >= 0.9" }
 
--- LuaDist source
 source = {
-  tag = "10.03.31-1",
-  url = "git://github.com/LuaDist-testing/cosmo.git"
+  url = "http://github.com/downloads/mascarenhas/cosmo/cosmo-10.04.06.tar.gz"
 }
--- Original source
--- source = {
---   url = "http://github.com/downloads/mascarenhas/cosmo/cosmo-10.03.31.tar.gz"
--- }
 
 build = {
    type = "builtin",
