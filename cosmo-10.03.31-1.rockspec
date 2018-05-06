@@ -2,7 +2,7 @@
 
 package = "cosmo"
 
-version = "9.09.22-1"
+version = "10.03.31-1"
 
 description = {
   summary = "Safe templates for Lua",
@@ -19,16 +19,16 @@ dependencies = { "lpeg >= 0.9" }
 
 -- LuaDist source
 source = {
-  tag = "9.09.22-1",
+  tag = "10.03.31-1",
   url = "git://github.com/LuaDist-testing/cosmo.git"
 }
 -- Original source
 -- source = {
---   url = "http://cosmo.luaforge.net/cosmo-9.09.22.tar.gz"
+--   url = "http://github.com/downloads/mascarenhas/cosmo/cosmo-10.03.31.tar.gz"
 -- }
 
 build = {
-   type = "module",
+   type = "builtin",
    modules = {
      cosmo = "src/cosmo.lua",
      ["cosmo.fill"] = "src/cosmo/fill.lua",
