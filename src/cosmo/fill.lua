@@ -24,6 +24,25 @@ local function fill_text(state, text)
   insert(state.out, text)
 end
 
+local function prepare_env(env, parent)
+  local meta = getmetatable(env)
+  if meta and meta.__index then
+    local index = meta.__index
+    meta.__index = function (t, k)
+		     local v
+		     if type(index) == "table" then 
+		       v = index[k] 
+		     else
+		       v = index(t, k)
+		     end
+		     if not v then v = parent[k] end
+		     return v
+		   end
+  else
+    setmetatable(env, { __index = parent })
+  end
+end
+
 local function fill_template_application(state, selector, args, first_subtemplate, 
 					 subtemplates)
    local fill = state.fill
@@ -51,8 +70,8 @@ local function fill_template_application(state, selector, args, first_subtemplat
 	    if type(e) ~= "table" then
 	       e = { it = tostring(e) }
 	    end
-	    if not getmetatable(e) then setmetatable(e, { __index = env }) end
-	    insert(out, fill(subtemplates[rawget(e, '_template') or 1], e, fill))
+	    prepare_env(e, env) 
+	    insert(out, fill(subtemplates[rawget(e, '_template') or 1] or "", e, fill))
 	 end
       else
 	 if type(selector) == 'table' then
@@ -60,16 +79,16 @@ local function fill_template_application(state, selector, args, first_subtemplat
 	       if type(e) ~= "table" then
 		  e = { it = tostring(e) }
 	       end
-	       if not getmetatable(e) then setmetatable(e, { __index = env }) end
-	       insert(out, fill(subtemplates[rawget(e, '_template') or 1], e, fill))
+	       prepare_env(e, env) 
+	       insert(out, fill(subtemplates[rawget(e, '_template') or 1] or "", e, fill))
 	    end
 	 else
 	    for e in coroutine.wrap(selector), nil, true do
 	       if type(e) ~= "table" then
 		  e = { it = tostring(e) }
 	       end
-	       if not getmetatable(e) then setmetatable(e, { __index = env }) end
-	       insert(out, fill(subtemplates[rawget(e, '_template') or 1], e, fill))
+	       prepare_env(e, env) 
+	       insert(out, fill(subtemplates[rawget(e, '_template') or 1] or "", e, fill))
 	    end
 	 end
       end
