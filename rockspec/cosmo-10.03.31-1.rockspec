@@ -1,6 +1,6 @@
 package = "Cosmo"
 
-version = "current-1"
+version = "10.03.31-1"
 
 description = {
   summary = "Safe templates for Lua",
@@ -13,14 +13,14 @@ without without the downside of allowing arbitrary code in the templates.
   homepage = "http://cosmo.luaforge.net"
 }
 
-dependencies = { "lpeg >= 0.8.1" }
+dependencies = { "lpeg >= 0.9" }
 
 source = {
-  url = "git://github.com/mascarenhas/cosmo.git"
+  url = "http://github.com/downloads/mascarenhas/cosmo/cosmo-10.03.31.tar.gz"
 }
 
 build = {
-   type = "module",
+   type = "builtin",
    modules = {
      cosmo = "src/cosmo.lua",
      ["cosmo.fill"] = "src/cosmo/fill.lua",

@@ -4,177 +4,227 @@ local grammar = require "cosmo.grammar"
 local interpreter = require "cosmo.fill"
 local loadstring = loadstring
 
-module(..., package.seeall)
+if _VERSION == "Lua 5.2" then
+  _ENV = setmetatable({}, { __index = _G })
+else
+  module(..., package.seeall)
+  _ENV = _M
+end
 
 yield = coroutine.yield
 
-local compiled_template = [[
-      local concat = table.concat
-      local insert = table.insert
-      local compile = compile
-      local getmetatable = getmetatable
-      local setmetatable = setmetatable
-      local function prepare_env(env, parent)
-        local meta = getmetatable(env)
-        if meta and meta.__index then
-          local index = meta.__index
-          meta.__index = function (t, k)
-			   local v
-			   if type(index) == "table" then 
-			     v = index[k] 
-			   else
-			     v = index(t, k)
-			   end
-                           if not v then v = parent[k] end
-                           return v
+local preamble = [[
+    local is_callable, insert, concat, setmetatable, getmetatable, type, wrap, tostring, check_selector = ...
+    local function unparse_name(parsed_selector)
+      local name = parsed_selector:match("^env%%['([%%w_]+)'%%]$")
+      if name then name = "$" .. name end
+      return name or parsed_selector
+    end
+    local function prepare_env(env, parent)
+      local __index = function (t, k)
+                        local v = env[k]
+                        if not v then
+                          v = parent[k]
+                        end
+                        return v
+                      end
+      local __newindex = function (t, k, v)
+                           env[k] = v
                          end
-        else
-          setmetatable(env, { __index = parent })
-        end
-      end
-      local function id() return "" end
-      return function (env)
-		local out = {}
-		if type(env) == "string" then env = { it = env } end
-		$parts[=[
-		      insert(out, $quoted_text)
-		]=],
-		[=[
-		      local selector = $parsed_selector
-		      local selector_name = '$selector'
-		      if not selector then selector = '$selector' end
-		      $if_subtemplate[==[
-			    local subtemplates = {}
-			    $subtemplates[===[
-				  subtemplates[$i] = compile($subtemplate)
-			    ]===]
-			    $if_args[===[
-				  for e in coroutine.wrap(selector), $args, true do
-				     if type(e) ~= "table" then
-					e = { it = tostring(e) }
-				     end
-				     prepare_env(e, env) 
-				     insert(out, (subtemplates[rawget(e, '_template') or 1] or id)(e))
-				  end
-			    ]===],
-			    [===[
-				  if type(selector) == 'table' then
-				     for _, e in ipairs(selector) do
-					if type(e) ~= "table" then
-					   e = { it = tostring(e) }
-					end
-					prepare_env(e, env) 
-					insert(out, (subtemplates[rawget(e, '_template') or 1] or id)(e))
-				     end
-				  else
-				     for e in coroutine.wrap(selector), nil, true do
-					if type(e) ~= "table" then
-					   e = { it = tostring(e) }
-					end
-					prepare_env(e, env) 
-					insert(out, (subtemplates[rawget(e, '_template') or 1] or id)(e))
-				     end
-				  end
-			    ]===]
-		      ]==],
-		      [==[
-			    $if_args[===[
-				  if type(selector) == 'function' then
-				     selector = selector($args, false)
-				  end
-				  insert(out, tostring(selector))
-			    ]===],
-			    [===[
-				  if type(selector) == 'function' then
-				     insert(out, tostring(selector()))
-				  else
-				     insert(out, tostring(selector))
-				  end
-			    ]===]
-		      ]==]
-		]=]
-	        return concat(out)
-             end
+      return setmetatable({ self = env }, { __index = __index, __newindex = __newindex })
+    end
+    local id = function () end
+    local template_func = %s
+    return function (env, opts)
+             opts = opts or {}
+             local out = opts.out or {}
+             template_func(out, env, opts)
+             return concat(out, opts.delim)
+           end
 ]]
 
-local function compile_text(chunkname, text)
-   return { _template = 1, quoted_text = string.format("%q", text) }
+local compiled_template = [[
+    function (out, env, opts)
+      if type(env) == "string" then env = { it = env } end
+      $parts[=[
+          insert(out, $quoted_text)
+      ]=],
+      [=[
+          local selector_name = unparse_name($selector)
+          local selector = $parsed_selector
+          $if_subtemplate[==[
+              local subtemplates = {}
+              $subtemplates[===[
+                  subtemplates[$i] = $subtemplate
+              ]===]
+              local default = id
+              if opts.fallback then
+                default = subtemplates[1]
+              end
+              $if_args[===[
+                  check_selector(selector_name, selector)
+                  for e, literal in wrap(selector), $args, true do
+                    if literal then
+                      insert(out, tostring(e))
+                    else
+                      if type(e) ~= "table" then
+                        e = prepare_env({ it = tostring(e) }, env)
+                      else
+                        e = prepare_env(e, env)
+                      end
+                      (subtemplates[e.self._template or 1] or default)(out, e, opts)
+                    end
+                  end
+              ]===],
+              [===[
+                  if type(selector) == 'table' then
+                    for _, e in ipairs(selector) do
+                      if type(e) ~= "table" then
+                        e = prepare_env({ it = tostring(e) }, env)
+                      else
+                        e = prepare_env(e, env)
+                      end
+                      (subtemplates[e.self._template or 1] or default)(out, e, opts)
+                    end
+                  else
+                    check_selector(selector_name, selector)
+                    for e, literal in wrap(selector), nil, true do
+                      if literal then
+                        insert(out, tostring(e))
+                      else
+                        if type(e) ~= "table" then
+                          e = prepare_env({ it = tostring(e) }, env)
+                        else
+                          e = prepare_env(e, env)
+                        end
+                        (subtemplates[e.self._template or 1] or default)(out, e, opts)
+                      end
+                    end
+                  end
+              ]===]
+          ]==],
+          [==[
+              $if_args[===[
+                  check_selector(selector_name, selector)
+                  selector = selector($args, false)
+                  insert(out, tostring(selector))
+              ]===],
+              [===[
+                  if is_callable(selector) then
+                    insert(out, tostring(selector()))
+                  else
+                    if not selector and opts.passthrough then
+                      selector = selector_name
+                    end
+                    insert(out, tostring(selector or ""))
+                  end
+              ]===]
+          ]==]
+      ]=]
+    end
+]]
+
+local function is_callable(f)
+  if type(f) == "function" then return true end
+  local meta = getmetatable(f)
+  if meta and meta.__call then return true end
+  return false
 end
 
-local function compile_template_application(chunkname, selector, args, first_subtemplate, 
-					    subtemplates)
-   subtemplates = subtemplates or {}
-   if first_subtemplate ~= "" then table.insert(subtemplates, 1, first_subtemplate) end
-   local ta = { _template = 2, selector = selector, 
-      parsed_selector = grammar.parse_selector(selector) }
-   local do_subtemplates = function ()
-			      for i, subtemplate in ipairs(subtemplates) do
-				 yield{ i = i, subtemplate = subtemplate }
-			      end
-			   end
-   if #subtemplates == 0 then
-      if args and args ~= "" then
-	 ta.if_subtemplate = { { _template = 2, if_args = { { _template = 1, args = args } } } }
-      else
-	 ta.if_subtemplate = { { _template = 2, if_args = { { _template = 2 } } } }
-      end
+local function check_selector(name, selector)
+  if not is_callable(selector) then
+    error("selector " .. name .. " is not callable but is " .. type(selector))
+  end
+end
+
+local function compile_template(chunkname, template_code)
+   local template_func, err = loadstring(string.format(preamble, template_code), chunkname)
+   if not template_func then
+     error("syntax error when compiling template: " .. err)
    else
-      if args and args ~= "" then
-	 ta.if_subtemplate = { { _template = 1, subtemplates = do_subtemplates,
-	       if_args = { { _template = 1, args = args } } } }
-      else
-	 ta.if_subtemplate = { { _template = 1, subtemplates = do_subtemplates,
-	       if_args = { { _template = 2 } } } }
-      end
+     return template_func(is_callable, table.insert, table.concat, setmetatable, getmetatable, type,
+                          coroutine.wrap, tostring, check_selector)
+   end
+end
+
+local compiler = {}
+
+function compiler.template(template)
+  assert(template.tag == "template")
+  local parts = {}
+  for _, part in ipairs(template.parts) do
+    parts[#parts+1] = compiler[part.tag](part)
+  end
+  return interpreter.fill(compiled_template, { parts = parts })
+end
+
+function compiler.text(text)
+  assert(text.tag == "text")
+  return { _template = 1, quoted_text = string.format("%q", text.text) }
+end
+
+function compiler.appl(appl)
+  assert(appl.tag == "appl")
+  local selector, args, subtemplates = appl.selector, appl.args, appl.subtemplates
+  local ta = { _template = 2, selector = string.format("%q", selector),
+      parsed_selector = selector }
+   local do_subtemplates = function ()
+                             for i, subtemplate in ipairs(subtemplates) do
+                               yield{ i = i, subtemplate = compiler.template(subtemplate) }
+                             end
+                           end
+   if #subtemplates == 0 then
+     if args and args ~= "" and args ~= "{}" then
+       ta.if_subtemplate = { { _template = 2, if_args = { { _template = 1, args = args } } } }
+     else
+       ta.if_subtemplate = { { _template = 2, if_args = { { _template = 2 } } } }
+     end
+   else
+     if args and args ~= "" and args ~= "{}" then
+       ta.if_subtemplate = { { _template = 1, subtemplates = do_subtemplates,
+                               if_args = { { _template = 1, args = args } } } }
+     else
+       ta.if_subtemplate = { { _template = 1, subtemplates = do_subtemplates,
+                               if_args = { { _template = 2 } } } }
+     end
    end
    return ta
 end
 
-local function compile_template(chunkname, compiled_parts)
-   local template_code = interpreter.fill(compiled_template, { parts = compiled_parts })
-   local template_func, err = loadstring(template_code, chunkname)
-   if not template_func then
-      error("syntax error when compiling template: " .. err)
-   else
-      setfenv(template_func, _M)
-      return template_func()
-   end
-end
-
-local compiler = grammar.cosmo_compiler{ text = compile_text,
-   template_application = compile_template_application, 
-   template = compile_template }
-
 local cache = {}
 setmetatable(cache, { __index = function (tab, key)
-				   local new = {}
-				   tab[key] = new
-				   return new
-				end,
-		      __mode = "v" })
+                                   local new = {}
+                                   tab[key] = new
+                                   return new
+                                end,
+                      __mode = "v" })
 
-function compile(template, chunkname)
+function compile(template, chunkname, opts)
+  opts = opts or {}
   template = template or ""
   chunkname = chunkname or template
   local compiled_template = cache[template][chunkname]
+  grammar.ast = opts.parser or grammar.default
   if not compiled_template then
-    compiled_template = compiler:match(template, 1, chunkname)
+    compiled_template = compile_template(chunkname, compiler.template(grammar.ast:match(template)))
     cache[template][chunkname] = compiled_template
   end
   return compiled_template
 end
 
 local filled_templates = {}
+setmetatable(filled_templates, { __mode = "k" })
 
-function fill(template, env)
+function fill(template, env, opts)
+   opts = opts or {}
    template = template or ""
    local start = template:match("^(%[=*%[)")
    if start then template = template:sub(#start + 1, #template - #start) end
-   if filled_templates[template] then 
-      return compile(template)(env)
+   if filled_templates[template] then
+      return compile(template, opts.chunkname, opts.parser)(env, opts)
    else
       filled_templates[template] = true
-      return interpreter.fill(template, env, fill)
+      return interpreter.fill(template, env, opts)
    end
 end
 
@@ -191,10 +241,10 @@ end
 f = compile
 
 function c(bool)
-   if bool then 
+   if bool then
       return function (table)
-		return function () yield(table) end
-	     end
+                return function () yield(table) end
+             end
    else
       return function (table) return nop end
    end
@@ -203,7 +253,7 @@ end
 function map(arg, has_block)
    if has_block then
       for _, item in ipairs(arg) do
-	 cosmo.yield(item)
+         yield(item)
       end
    else
       return table.concat(arg)
@@ -211,5 +261,80 @@ function map(arg, has_block)
 end
 
 function inject(arg)
-   cosmo.yield(arg)
+   yield(arg)
 end
+
+function cif(arg, has_block)
+  if not has_block then error("this selector needs a block") end
+  if arg[1] then
+    arg._template = 1
+  else
+    arg._template = 2
+  end
+  yield(arg)
+end
+
+function concat(arg)
+  local list, sep = arg[1], arg[2] or ", "
+  local size = #list
+  for i, e in ipairs(list) do
+    if type(e) == "table" then
+      if i ~= size then
+        yield(e)
+        yield(sep, true)
+      else
+        yield(e)
+      end
+    else
+      if i ~= size then
+        yield{ it = e }
+        yield(sep, true)
+      else
+        yield{ it = e }
+      end
+    end
+  end
+end
+
+function make_concat(list)
+  return function (arg)
+           local sep = (arg and arg[1]) or ", "
+           local size = #list
+           for i, e in ipairs(list) do
+             if type(e) == "table" then
+               if i ~= size then
+                 yield(e)
+                 yield(sep, true)
+               else
+                 yield(e)
+               end
+             else
+               if i ~= size then
+                 yield{ it = e }
+                 yield(sep, true)
+               else
+                 yield{ it = e }
+               end
+             end
+           end
+         end
+end
+
+function cfor(args)
+  local name, list, args = args[1], args[2], args[3]
+  if type(list) == "table" then
+    for i, item in ipairs(list) do
+      yield({ [name] = item, i = i })
+    end
+  else
+    for item, literal in coroutine.wrap(list), args, true do
+      if literal then
+        yield(item, true)
+      else
+        yield({ [name] = item })
+      end
+    end
+  end
+end
+
+return _ENV
