@@ -1,8 +1,9 @@
 
 local lpeg = require "lpeg"
 local re = require "re"
+local unpack = table.unpack or unpack
 
-if _VERSION == "Lua 5.2" then
+if _VERSION ~= "Lua 5.1" then
   _ENV = setmetatable({}, { __index = _G })
 else
   module(..., package.seeall)
@@ -37,12 +38,10 @@ local longstring1 = lpeg.P{
   longstring = lpeg.P"[[" * (lpeg.V"longstring" + (lpeg.P(1) - lpeg.P"]]"))^0 * lpeg.P"]]"
 }
 
-local longstring2 = lpeg.P(function (s, i)
-  local l = lpeg.match(start, s, i)
-  if not l then return nil end
-  local p = lpeg.P("]" .. string.rep("=", l - i - 2) .. "]")
-  p = (1 - p)^0 * p
-  return lpeg.match(p, s, l)
+local longstring2 = lpeg.Cmt(start, function (s, i, start)
+  local p = string.gsub(start, "%[", "]")
+  local _, e = string.find(s, p, i)
+  return (e and e + 1)
 end)
 
 local longstring = #("[" * lpeg.S"[=") * (longstring1 + longstring2)

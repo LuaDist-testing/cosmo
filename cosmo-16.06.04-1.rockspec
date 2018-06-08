@@ -2,13 +2,13 @@
 
 package = "cosmo"
 
-version = "13.01.30-1"
+version = "16.06.04-1"
 
 description = {
   summary = "Safe templates for Lua",
   detailed = [[
-Cosmo is a "safe templates" engine. It allows you to fill nested templates, 
-providing many of the advantages of Turing-complete template engines, 
+Cosmo is a "safe templates" engine. It allows you to fill nested templates,
+providing many of the advantages of Turing-complete template engines,
 without without the downside of allowing arbitrary code in the templates.
   ]],
   license = "MIT/X11",
@@ -19,12 +19,13 @@ dependencies = { "lpeg >= 0.9" }
 
 -- LuaDist source
 source = {
-  tag = "13.01.30-1",
+  tag = "16.06.04-1",
   url = "git://github.com/LuaDist-testing/cosmo.git"
 }
 -- Original source
 -- source = {
---   url = "http://www.keplerproject.org/files/cosmo-13.01.30.tar.gz"
+--   url = "git://github.com/mascarenhas/cosmo.git",
+--   branch = "v16.06.04"
 -- }
 
 build = {
